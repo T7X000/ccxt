@@ -503,6 +503,9 @@ func CreateExchange(exchangeId string, options map[string]any) IExchange {
 	case "revolutx":
 		itf := NewRevolutx(options)
 		return itf
+	case "t7x":
+		itf := NewT7x(options)
+		return itf
 	case "tokocrypto":
 		itf := NewTokocrypto(options)
 		return itf

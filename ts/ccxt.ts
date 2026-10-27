@@ -140,6 +140,7 @@ import phemex from  './src/phemex.js'
 import poloniex from  './src/poloniex.js'
 import polymarket from  './src/polymarket.js'
 import revolutx from  './src/revolutx.js'
+import t7x from  './src/t7x.js'
 import tokocrypto from  './src/tokocrypto.js'
 import toobit from  './src/toobit.js'
 import upbit from  './src/upbit.js'
@@ -222,6 +223,7 @@ import paradexPro from  './src/pro/paradex.js'
 import phemexPro from  './src/pro/phemex.js'
 import poloniexPro from  './src/pro/poloniex.js'
 import polymarketPro from  './src/pro/polymarket.js'
+import t7xPro from  './src/pro/t7x.js'
 import toobitPro from  './src/pro/toobit.js'
 import upbitPro from  './src/pro/upbit.js'
 import weexPro from  './src/pro/weex.js'
@@ -335,6 +337,7 @@ const exchanges = {
     'poloniex':               poloniex,
     'polymarket':             polymarket,
     'revolutx':               revolutx,
+    't7x':                    t7x,
     'tokocrypto':             tokocrypto,
     'toobit':                 toobit,
     'upbit':                  upbit,
@@ -417,6 +420,7 @@ const pro = {
     'phemex':                 phemexPro,
     'poloniex':               poloniexPro,
     'polymarket':             polymarketPro,
+    't7x':                    t7xPro,
     'toobit':                 toobitPro,
     'upbit':                  upbitPro,
     'weex':                   weexPro,
@@ -710,6 +714,7 @@ export {
     poloniex,
     polymarket,
     revolutx,
+    t7x,
     tokocrypto,
     toobit,
     upbit,

@@ -126,6 +126,7 @@ from ccxt.pro.paradex import paradex                                      # noqa
 from ccxt.pro.phemex import phemex                                        # noqa: F401
 from ccxt.pro.poloniex import poloniex                                    # noqa: F401
 from ccxt.pro.polymarket import polymarket                                # noqa: F401
+from ccxt.pro.t7x import t7x                                              # noqa: F401
 from ccxt.pro.toobit import toobit                                        # noqa: F401
 from ccxt.pro.upbit import upbit                                          # noqa: F401
 from ccxt.pro.weex import weex                                            # noqa: F401
@@ -204,6 +205,7 @@ exchanges = [
     'phemex',
     'poloniex',
     'polymarket',
+    't7x',
     'toobit',
     'upbit',
     'weex',

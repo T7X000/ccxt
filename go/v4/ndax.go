@@ -1755,11 +1755,11 @@ func (this *Ndax) fetchBalanceBody(ch chan AsyncResult[Balances], optionalArgs .
 		"AccountId": accountId,
 	}
 
-	r2 := <-this.PrivateGetGetAccountPositions(this.Extend(request, paramsOmitted))
-	if r2.Err != nil {
-		panic(r2.Err)
+	listEp1688 := <-this.PrivateGetGetAccountPositions(this.Extend(request, paramsOmitted))
+	if listEp1688.Err != nil {
+		panic(listEp1688.Err)
 	}
-	var response map[string]any = r2.Value
+	var response []any = listEp1688.Value
 
 	//
 	//     [

@@ -453,6 +453,7 @@ class BaseExchange {
         'poloniex',
         'polymarket',
         'revolutx',
+        't7x',
         'tokocrypto',
         'toobit',
         'upbit',

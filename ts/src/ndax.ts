@@ -214,7 +214,7 @@ export default class ndax extends Exchange {
                         'GetUserReportTickets': { 'cost': 1 } as Endpoint<List>,
                         'GetUserReportWriterResultRecords': { 'cost': 1 } as Endpoint<List>,
                         'GetAccountInfo': { 'cost': 1 } as Endpoint<Dict>,
-                        'GetAccountPositions': { 'cost': 1 } as Endpoint<Dict>,
+                        'GetAccountPositions': { 'cost': 1 } as Endpoint<List>,
                         'GetAllAccountConfigs': { 'cost': 1 } as Endpoint<List>,
                         'GetTreasuryProductsForAccount': { 'cost': 1 } as Endpoint<List>,
                         'GetAccountTrades': { 'cost': 1 } as Endpoint<List>,

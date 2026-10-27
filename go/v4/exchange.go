@@ -12,7 +12,9 @@ import (
 	random2 "math/rand"
 	"net"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
+	"os"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -296,13 +298,56 @@ func (this *BaseExchange) InitParent(userConfig map[string]any, exchangeConfig m
 
 	this.streaming = this.SafeDict(extendedProperties, "streaming", map[string]any{}).(map[string]any)
 	this.transformApiNew(this.Api)
-	transport := newDualStackTransport()
+	//transport := newDualStackTransport()
+	// TODO REMOVE
+	var transport http.RoundTripper
+	_, extraVerbose := os.LookupEnv("CCXT_OUTPUT_HTTP")
+	if extraVerbose {
+		transport = &loggingTransport{}
+	} else {
+		transport = newDualStackTransport()
+	}
+	// TODO REMOVE
 
 	this.httpClient = &http.Client{
 		Timeout:   30 * time.Second,
 		Transport: transport,
 	}
 }
+
+// TODO REMOVE
+type loggingTransport struct {
+	transport http.RoundTripper
+}
+
+func (l *loggingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	transport := l.transport
+	if transport == nil {
+		transport = http.DefaultTransport
+	}
+
+	// Dump outgoing request
+	dump, err := httputil.DumpRequestOut(req, true)
+	if err == nil {
+		fmt.Printf("\n[REQ] %s\n", dump)
+	}
+
+	// Invoke the request
+	resp, err := transport.RoundTrip(req)
+	if err != nil {
+		return resp, err
+	}
+
+	// Dump incoming response
+	dump, err = httputil.DumpResponse(resp, true)
+	if err == nil {
+		fmt.Printf("\n[RESP] %s\n", dump)
+	}
+
+	return resp, err
+}
+
+// TODO REMOVE
 
 func (this *BaseExchange) Init(userConfig map[string]any) {
 	if this.FetchHistoryCache == nil {

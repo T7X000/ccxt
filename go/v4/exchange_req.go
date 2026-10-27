@@ -74,7 +74,7 @@ func (this *BaseExchange) FetchAsync(url any, method any, headers any, body any)
 		case nil:
 		case map[string]any:
 			for k, v := range h {
-				headersStrMap[k] = fmt.Sprintf("%v", v)
+				headersStrMap[k] = headerValueToString(v)
 			}
 		case map[string]string:
 			for k, v := range h {
@@ -89,7 +89,7 @@ func (this *BaseExchange) FetchAsync(url any, method any, headers any, body any)
 			if headersOptions != nil {
 				for key, value := range headersOptions.(map[string]any) {
 					if _, exists := headersStrMap[key]; !exists {
-						headersStrMap[key] = fmt.Sprintf("%v", value)
+						headersStrMap[key] = headerValueToString(value)
 					}
 				}
 			} else {
@@ -306,4 +306,17 @@ func HeaderToMap(header http.Header) map[string]any {
 		}
 	}
 	return result
+}
+
+// headerValueToString formats a request header value. Transpiled sign() methods can put a
+// scalar pointer in a header (SafeString returns *string), which %v would print as an address,
+// so those are dereferenced. Every other value (maps, slices, nil) is formatted as before.
+func headerValueToString(v any) string {
+	switch v.(type) {
+	case *string, *int64, *float64, *bool, *int:
+		if s := derefScalar(v); s != nil {
+			return fmt.Sprintf("%v", s)
+		}
+	}
+	return fmt.Sprintf("%v", v)
 }

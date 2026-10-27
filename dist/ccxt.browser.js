@@ -185487,7 +185487,7 @@ const QUOTE_JSON_NUMBERS_REGEX = /":([+.0-9eE-]+)(?=[,}])/g;
     }
 }
 // this is updated by vss.js when building
-_define_property(BaseExchange, "ccxtVersion", '4.5.89');
+_define_property(BaseExchange, "ccxtVersion", '4.5.90');
 class Exchange extends BaseExchange {
     async closePosition(symbol, side = undefined, params = {}) {
         throw new _errors_js__rspack_import_2.NotSupported(this.id + ' closePosition() is not supported yet');
@@ -610402,6 +610402,189 @@ __webpack_require__.d(__webpack_exports__, {
 
 
 },
+2011(__unused_rspack_module, __webpack_exports__, __webpack_require__) {
+"use strict";
+/* import */ var _ndax_js__rspack_import_0 = __webpack_require__(4825);
+/* import */ var _noble_hashes_sha2_js__rspack_import_2 = __webpack_require__(4721);
+/* import */ var _base_errors_js__rspack_import_1 = __webpack_require__(1453);
+//  ---------------------------------------------------------------------------
+
+
+
+class t7x extends _ndax_js__rspack_import_0/* ["default"] */.A {
+    describe() {
+        // super.describe () is the ndax rest + ndax ws description, so the T7X REST values from ../t7x.ts are repeated here as well
+        return this.deepExtend(super.describe(), {
+            'id': 't7x',
+            'name': 'T7X',
+            'countries': [
+                'US'
+            ],
+            'certified': false,
+            'pro': true,
+            'urls': {
+                'logo': 'https://t7x.io/assets/images/logos/logo.png',
+                'test': {
+                    'public': 'https://api.t7x.apstage.net/AP',
+                    'private': 'https://api.t7x.apstage.net/AP',
+                    'ws': 'wss://api.t7x.apstage.net/WSGateway'
+                },
+                'api': {
+                    'public': 'https://api.t7x.alphaprod.net/AP',
+                    'private': 'https://api.t7x.alphaprod.net/AP',
+                    'ws': 'wss://api.t7x.alphaprod.net/WSGateway'
+                },
+                'www': undefined,
+                'doc': [
+                    'https://alphapoint.github.io/slate/'
+                ],
+                'fees': undefined,
+                'referral': undefined
+            },
+            'options': {
+                'omsId': 1
+            },
+            'requiredCredentials': {
+                'apiKey': true,
+                'secret': true,
+                'uid': true,
+                'login': false,
+                'password': false
+            }
+        });
+    }
+    /**
+     * @method
+     * @name t7x#signIn
+     * @description sign in with the api key and get a session token, used by private calls that need one (e.g. withdraw)
+     * @see https://alphapoint.github.io/slate/#authenticateuser
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @returns {object} the AuthenticateUser response
+     */ async signIn(params = {}) {
+        this.checkRequiredCredentials();
+        // sign () sends the APIKey, Signature, UserId and Nonce headers for this endpoint
+        const response = await this.publicGetAuthenticateUser(params);
+        //
+        //     {
+        //         "Authenticated": true,
+        //         "SessionToken": "4a2a5857-c4e5-4fac-b09e-2c4c30b591a0",
+        //         "User": { "UserId": 96, "UserName": "", "AccountId": 0, "OMSId": 1, "Use2FA": false },
+        //         "Locked": false,
+        //         "Requires2FA": false,
+        //         "errormsg": ""
+        //     }
+        //
+        const sessionToken = this.safeString2(response, 'SessionToken', 'sessionToken');
+        if (sessionToken === undefined) {
+            throw new _base_errors_js__rspack_import_1.AuthenticationError(this.id + ' signIn() failed: ' + this.json(response));
+        }
+        this.options['sessionToken'] = sessionToken;
+        return response;
+    }
+    /**
+     * @ignore
+     * @method
+     * @name t7x#apiKeyAuthHeaders
+     * @description the AlphaPoint api key authentication headers, signature = hmac-sha256 (nonce + userId + apiKey, secret)
+     * @returns {object} the Nonce, APIKey, Signature and UserId headers
+     */ apiKeyAuthHeaders() {
+        const nonce = this.nonce().toString();
+        const auth = nonce + this.uid + this.apiKey;
+        const signature = this.hmac(this.encode(auth), this.encode(this.secret), _noble_hashes_sha2_js__rspack_import_2/* .sha256 */.sc);
+        return {
+            'Nonce': nonce,
+            'APIKey': this.apiKey,
+            'Signature': signature,
+            'UserId': this.uid
+        };
+    }
+    /**
+     * @method
+     * @name t7x#sign
+     * @description T7X request signing, replaces the inherited ndax#sign
+     * @param {string} path - the endpoint path
+     * @param {string[]} api - the api name, ['public'] or ['private']
+     * @param {string} method - the HTTP method
+     * @param {Dict} params - the request params
+     * @returns { Dict } the signed authentication request headers
+     * starts as a copy of ndax#sign, change it to match T7X's authentication
+     */ sign(path, api = [
+        'public'
+    ], method = 'GET', params = {}) {
+        const apiName = api[0];
+        let bodySigned = undefined;
+        let headersSigned = undefined;
+        const apiUrl = this.safeString(this.urls['api'], apiName);
+        if (apiUrl === undefined) {
+            throw new _base_errors_js__rspack_import_1.ExchangeError(this.id + ' sign() has no API URL for this endpoint');
+        }
+        let url = apiUrl + '/' + this.implodeParams(path, params);
+        let query = this.omit(params, this.extractParams(path));
+        if (apiName === 'public') {
+            if (path === 'AuthenticateUser') {
+                this.checkRequiredCredentials();
+                headersSigned = this.apiKeyAuthHeaders();
+            } else if (path === 'Authenticate') {
+                const auth = this.login + ':' + this.password;
+                const auth64 = this.stringToBase64(auth);
+                headersSigned = {
+                    'Authorization': 'Basic ' + auth64
+                };
+            } else if (path === 'Authenticate2FA') {
+                const pending2faToken = this.safeString(this.options, 'pending2faToken');
+                if (pending2faToken !== undefined) {
+                    headersSigned = {
+                        'Pending2FaToken': pending2faToken
+                    };
+                    query = this.omit(query, 'pending2faToken');
+                }
+            }
+            if (Object.keys(query).length > 0) {
+                url += '?' + this.urlencode(query);
+            }
+        } else if (apiName === 'private') {
+            this.checkRequiredCredentials();
+            const sessionToken = this.safeString(this.options, 'sessionToken');
+            if (sessionToken === undefined) {
+                headersSigned = this.apiKeyAuthHeaders();
+            } else {
+                headersSigned = {
+                    'APToken': sessionToken
+                };
+            }
+            if (method === 'POST') {
+                headersSigned['Content-Type'] = 'application/json';
+                bodySigned = this.json(query);
+            } else {
+                if (Object.keys(query).length > 0) {
+                    url += '?' + this.urlencode(query);
+                }
+            }
+        }
+        const headersResolved = headersSigned;
+        const bodyResolved = bodySigned;
+        return {
+            'url': url,
+            'method': method,
+            'body': bodyResolved,
+            'headers': headersResolved
+        };
+    }
+}
+//import type { Balances, Dict, NullableDict, Str } from '../base/types.js';
+//  ---------------------------------------------------------------------------
+/**
+ * @class t7x
+ * @augments ndax
+ * @description T7X runs on the AlphaPoint APEX platform, the same platform as NDAX, so it reuses the ndax implementation with its own endpoints
+ */ 
+
+__webpack_require__.d(__webpack_exports__, {
+  A: () => (t7x)
+});
+
+
+},
 3039(__unused_rspack_module, __webpack_exports__, __webpack_require__) {
 "use strict";
 /* import */ var _toobit_js__rspack_import_0 = __webpack_require__(7939);
@@ -625890,6 +626073,186 @@ __webpack_require__.d(__webpack_exports__, {
   encodeAsAny: () => (encodeAsAny)
 }, {
   registry: registry
+});
+
+
+},
+7047(__unused_rspack_module, __webpack_exports__, __webpack_require__) {
+"use strict";
+/* import */ var _ndax_js__rspack_import_0 = __webpack_require__(8573);
+/* import */ var _noble_hashes_sha2_js__rspack_import_2 = __webpack_require__(4721);
+/* import */ var _base_errors_js__rspack_import_1 = __webpack_require__(1453);
+//  ---------------------------------------------------------------------------
+
+
+
+class t7x extends _ndax_js__rspack_import_0/* ["default"] */.A {
+    describe() {
+        return this.deepExtend(super.describe(), {
+            'id': 't7x',
+            'name': 'T7X',
+            'countries': [
+                'US'
+            ],
+            'certified': false,
+            'pro': true,
+            'urls': {
+                'logo': 'https://t7x.io/assets/images/logos/logo.png',
+                'test': {
+                    'public': 'https://api.t7x.apstage.net/AP',
+                    'private': 'https://api.t7x.apstage.net/AP'
+                },
+                'api': {
+                    'public': 'https://api.t7x.alphaprod.net/AP',
+                    'private': 'https://api.t7x.alphaprod.net/AP'
+                },
+                'www': 'https://t7x.io',
+                'doc': [
+                    'https://alphapoint.github.io/slate/'
+                ],
+                'fees': undefined,
+                'referral': undefined
+            },
+            'options': {
+                'omsId': 1
+            },
+            'requiredCredentials': {
+                'apiKey': true,
+                'secret': true,
+                'uid': true,
+                'login': false,
+                'password': false
+            }
+        });
+    }
+    /**
+     * @method
+     * @name t7x#signIn
+     * @description sign in with the api key and get a session token, used by private calls that need one (e.g. withdraw)
+     * @see https://alphapoint.github.io/slate/#authenticateuser
+     * @param {object} [params] extra parameters specific to the exchange API endpoint
+     * @returns {object} the AuthenticateUser response
+     */ async signIn(params = {}) {
+        this.checkRequiredCredentials();
+        // sign () sends the APIKey, Signature, UserId and Nonce headers for this endpoint
+        const response = await this.publicGetAuthenticateUser(params);
+        //
+        //     {
+        //         "Authenticated": true,
+        //         "SessionToken": "4a2a5857-c4e5-4fac-b09e-2c4c30b591a0",
+        //         "User": { "UserId": 96, "UserName": "", "AccountId": 0, "OMSId": 1, "Use2FA": false },
+        //         "Locked": false,
+        //         "Requires2FA": false,
+        //         "errormsg": ""
+        //     }
+        //
+        const sessionToken = this.safeString2(response, 'SessionToken', 'sessionToken');
+        if (sessionToken === undefined) {
+            throw new _base_errors_js__rspack_import_1.AuthenticationError(this.id + ' signIn() failed: ' + this.json(response));
+        }
+        this.options['sessionToken'] = sessionToken;
+        return response;
+    }
+    /**
+     * @ignore
+     * @method
+     * @name t7x#apiKeyAuthHeaders
+     * @description the AlphaPoint api key authentication headers, signature = hmac-sha256 (nonce + userId + apiKey, secret)
+     * @returns {object} the Nonce, APIKey, Signature and UserId headers
+     */ apiKeyAuthHeaders() {
+        const nonce = this.nonce().toString();
+        const auth = nonce + this.uid + this.apiKey;
+        const signature = this.hmac(this.encode(auth), this.encode(this.secret), _noble_hashes_sha2_js__rspack_import_2/* .sha256 */.sc);
+        return {
+            'Nonce': nonce,
+            'APIKey': this.apiKey,
+            'Signature': signature,
+            'UserId': this.uid
+        };
+    }
+    /**
+     * @method
+     * @name t7x#sign
+     * @description T7X request signing, replaces the inherited ndax#sign
+     * @param {string} path - the endpoint path
+     * @param {string[]} api - the api name, ['public'] or ['private']
+     * @param {string} method - the HTTP method
+     * @param {Dict} params - the request params
+     * @returns { Dict } the signed authentication request headers
+     * starts as a copy of ndax#sign, change it to match T7X's authentication
+     */ sign(path, api = [
+        'public'
+    ], method = 'GET', params = {}) {
+        const apiName = api[0];
+        let bodySigned = undefined;
+        let headersSigned = undefined;
+        const apiUrl = this.safeString(this.urls['api'], apiName);
+        if (apiUrl === undefined) {
+            throw new _base_errors_js__rspack_import_1.ExchangeError(this.id + ' sign() has no API URL for this endpoint');
+        }
+        let url = apiUrl + '/' + this.implodeParams(path, params);
+        let query = this.omit(params, this.extractParams(path));
+        if (apiName === 'public') {
+            if (path === 'AuthenticateUser') {
+                this.checkRequiredCredentials();
+                headersSigned = this.apiKeyAuthHeaders();
+            } else if (path === 'Authenticate') {
+                const auth = this.login + ':' + this.password;
+                const auth64 = this.stringToBase64(auth);
+                headersSigned = {
+                    'Authorization': 'Basic ' + auth64
+                };
+            } else if (path === 'Authenticate2FA') {
+                const pending2faToken = this.safeString(this.options, 'pending2faToken');
+                if (pending2faToken !== undefined) {
+                    headersSigned = {
+                        'Pending2FaToken': pending2faToken
+                    };
+                    query = this.omit(query, 'pending2faToken');
+                }
+            }
+            if (Object.keys(query).length > 0) {
+                url += '?' + this.urlencode(query);
+            }
+        } else if (apiName === 'private') {
+            this.checkRequiredCredentials();
+            const sessionToken = this.safeString(this.options, 'sessionToken');
+            if (sessionToken === undefined) {
+                headersSigned = this.apiKeyAuthHeaders();
+            } else {
+                headersSigned = {
+                    'APToken': sessionToken
+                };
+            }
+            if (method === 'POST') {
+                headersSigned['Content-Type'] = 'application/json';
+                bodySigned = this.json(query);
+            } else {
+                if (Object.keys(query).length > 0) {
+                    url += '?' + this.urlencode(query);
+                }
+            }
+        }
+        const headersResolved = headersSigned;
+        const bodyResolved = bodySigned;
+        return {
+            'url': url,
+            'method': method,
+            'body': bodyResolved,
+            'headers': headersResolved
+        };
+    }
+}
+//import type { Balances, Dict, NullableDict, Str } from './base/types.js';
+//  ---------------------------------------------------------------------------
+/**
+ * @class t7x
+ * @augments ndax
+ * @description T7X runs on the AlphaPoint APEX platform, the same platform as NDAX, so it reuses the ndax implementation with its own endpoints
+ */ 
+
+__webpack_require__.d(__webpack_exports__, {
+  A: () => (t7x)
 });
 
 
@@ -689216,101 +689579,103 @@ __webpack_require__.r(__webpack_exports__);
 /* import */ var _src_poloniex_js__rspack_import_97 = __webpack_require__(2406);
 /* import */ var _src_polymarket_js__rspack_import_98 = __webpack_require__(9896);
 /* import */ var _src_revolutx_js__rspack_import_99 = __webpack_require__(6711);
-/* import */ var _src_tokocrypto_js__rspack_import_100 = __webpack_require__(9660);
-/* import */ var _src_toobit_js__rspack_import_101 = __webpack_require__(7939);
-/* import */ var _src_upbit_js__rspack_import_102 = __webpack_require__(1692);
-/* import */ var _src_weex_js__rspack_import_103 = __webpack_require__(4691);
-/* import */ var _src_whitebit_js__rspack_import_104 = __webpack_require__(410);
-/* import */ var _src_woo_js__rspack_import_105 = __webpack_require__(4615);
-/* import */ var _src_woofipro_js__rspack_import_106 = __webpack_require__(6499);
-/* import */ var _src_xt_js__rspack_import_107 = __webpack_require__(1434);
-/* import */ var _src_zaif_js__rspack_import_108 = __webpack_require__(100);
-/* import */ var _src_zebpay_js__rspack_import_109 = __webpack_require__(307);
-/* import */ var _src_pro_alpaca_js__rspack_import_110 = __webpack_require__(292);
-/* import */ var _src_pro_apex_js__rspack_import_111 = __webpack_require__(9222);
-/* import */ var _src_pro_aster_js__rspack_import_112 = __webpack_require__(8443);
-/* import */ var _src_pro_backpack_js__rspack_import_113 = __webpack_require__(6476);
-/* import */ var _src_pro_bequant_js__rspack_import_114 = __webpack_require__(5284);
-/* import */ var _src_pro_binance_js__rspack_import_115 = __webpack_require__(7802);
-/* import */ var _src_pro_binancecoinm_js__rspack_import_116 = __webpack_require__(4264);
-/* import */ var _src_pro_binanceus_js__rspack_import_117 = __webpack_require__(3402);
-/* import */ var _src_pro_binanceusdm_js__rspack_import_118 = __webpack_require__(905);
-/* import */ var _src_pro_bingx_js__rspack_import_119 = __webpack_require__(9926);
-/* import */ var _src_pro_bitfinex_js__rspack_import_120 = __webpack_require__(5019);
-/* import */ var _src_pro_bitget_js__rspack_import_121 = __webpack_require__(1179);
-/* import */ var _src_pro_bithumb_js__rspack_import_122 = __webpack_require__(479);
-/* import */ var _src_pro_bitopro_js__rspack_import_123 = __webpack_require__(5707);
-/* import */ var _src_pro_bitrue_js__rspack_import_124 = __webpack_require__(7363);
-/* import */ var _src_pro_bitstamp_js__rspack_import_125 = __webpack_require__(2652);
-/* import */ var _src_pro_bittrade_js__rspack_import_126 = __webpack_require__(85);
-/* import */ var _src_pro_bitvavo_js__rspack_import_127 = __webpack_require__(6385);
-/* import */ var _src_pro_blockchaincom_js__rspack_import_128 = __webpack_require__(9343);
-/* import */ var _src_pro_blofin_js__rspack_import_129 = __webpack_require__(270);
-/* import */ var _src_pro_bullish_js__rspack_import_130 = __webpack_require__(7755);
-/* import */ var _src_pro_bybit_js__rspack_import_131 = __webpack_require__(7832);
-/* import */ var _src_pro_bybiteu_js__rspack_import_132 = __webpack_require__(5538);
-/* import */ var _src_pro_bybitid_js__rspack_import_133 = __webpack_require__(9301);
-/* import */ var _src_pro_bydfi_js__rspack_import_134 = __webpack_require__(338);
-/* import */ var _src_pro_cex_js__rspack_import_135 = __webpack_require__(6340);
-/* import */ var _src_pro_coinbase_js__rspack_import_136 = __webpack_require__(3434);
-/* import */ var _src_pro_coinbaseexchange_js__rspack_import_137 = __webpack_require__(4867);
-/* import */ var _src_pro_coinbaseinternational_js__rspack_import_138 = __webpack_require__(2896);
-/* import */ var _src_pro_coincheck_js__rspack_import_139 = __webpack_require__(8951);
-/* import */ var _src_pro_coinone_js__rspack_import_140 = __webpack_require__(7087);
-/* import */ var _src_pro_cryptocom_js__rspack_import_141 = __webpack_require__(8202);
-/* import */ var _src_pro_deepcoin_js__rspack_import_142 = __webpack_require__(1837);
-/* import */ var _src_pro_deribit_js__rspack_import_143 = __webpack_require__(673);
-/* import */ var _src_pro_derive_js__rspack_import_144 = __webpack_require__(3253);
-/* import */ var _src_pro_dydx_js__rspack_import_145 = __webpack_require__(9601);
-/* import */ var _src_pro_extended_js__rspack_import_146 = __webpack_require__(9195);
-/* import */ var _src_pro_gate_js__rspack_import_147 = __webpack_require__(2541);
-/* import */ var _src_pro_gateeu_js__rspack_import_148 = __webpack_require__(2227);
-/* import */ var _src_pro_gemini_js__rspack_import_149 = __webpack_require__(4453);
-/* import */ var _src_pro_grvt_js__rspack_import_150 = __webpack_require__(9193);
-/* import */ var _src_pro_hashkey_js__rspack_import_151 = __webpack_require__(5915);
-/* import */ var _src_pro_hitbtc_js__rspack_import_152 = __webpack_require__(3906);
-/* import */ var _src_pro_hollaex_js__rspack_import_153 = __webpack_require__(293);
-/* import */ var _src_pro_htx_js__rspack_import_154 = __webpack_require__(2404);
-/* import */ var _src_pro_hyperliquid_js__rspack_import_155 = __webpack_require__(8334);
-/* import */ var _src_pro_independentreserve_js__rspack_import_156 = __webpack_require__(6164);
-/* import */ var _src_pro_kraken_js__rspack_import_157 = __webpack_require__(4400);
-/* import */ var _src_pro_krakenfutures_js__rspack_import_158 = __webpack_require__(3690);
-/* import */ var _src_pro_kucoin_js__rspack_import_159 = __webpack_require__(4427);
-/* import */ var _src_pro_kucoinfutures_js__rspack_import_160 = __webpack_require__(6335);
-/* import */ var _src_pro_lbank_js__rspack_import_161 = __webpack_require__(5409);
-/* import */ var _src_pro_lighter_js__rspack_import_162 = __webpack_require__(975);
-/* import */ var _src_pro_luno_js__rspack_import_163 = __webpack_require__(2678);
-/* import */ var _src_pro_mexc_js__rspack_import_164 = __webpack_require__(941);
-/* import */ var _src_pro_modetrade_js__rspack_import_165 = __webpack_require__(5931);
-/* import */ var _src_pro_mudrex_js__rspack_import_166 = __webpack_require__(9671);
-/* import */ var _src_pro_myokx_js__rspack_import_167 = __webpack_require__(2472);
-/* import */ var _src_pro_nado_js__rspack_import_168 = __webpack_require__(2934);
-/* import */ var _src_pro_ndax_js__rspack_import_169 = __webpack_require__(4825);
-/* import */ var _src_pro_okx_js__rspack_import_170 = __webpack_require__(4302);
-/* import */ var _src_pro_okxus_js__rspack_import_171 = __webpack_require__(9302);
-/* import */ var _src_pro_onetrading_js__rspack_import_172 = __webpack_require__(1503);
-/* import */ var _src_pro_p2b_js__rspack_import_173 = __webpack_require__(9304);
-/* import */ var _src_pro_pacifica_js__rspack_import_174 = __webpack_require__(3100);
-/* import */ var _src_pro_paradex_js__rspack_import_175 = __webpack_require__(2935);
-/* import */ var _src_pro_phemex_js__rspack_import_176 = __webpack_require__(8009);
-/* import */ var _src_pro_poloniex_js__rspack_import_177 = __webpack_require__(1818);
-/* import */ var _src_pro_polymarket_js__rspack_import_178 = __webpack_require__(7292);
-/* import */ var _src_pro_toobit_js__rspack_import_179 = __webpack_require__(3039);
-/* import */ var _src_pro_upbit_js__rspack_import_180 = __webpack_require__(3296);
-/* import */ var _src_pro_weex_js__rspack_import_181 = __webpack_require__(7095);
-/* import */ var _src_pro_whitebit_js__rspack_import_182 = __webpack_require__(3990);
-/* import */ var _src_pro_woo_js__rspack_import_183 = __webpack_require__(3363);
-/* import */ var _src_pro_woofipro_js__rspack_import_184 = __webpack_require__(5959);
-/* import */ var _src_pro_xt_js__rspack_import_185 = __webpack_require__(846);
-/* import */ var _src_prediction_binance_js__rspack_import_186 = __webpack_require__(1538);
-/* import */ var _src_prediction_hyperliquid_js__rspack_import_187 = __webpack_require__(6470);
-/* import */ var _src_prediction_kalshi_js__rspack_import_188 = __webpack_require__(7788);
-/* import */ var _src_prediction_limitless_js__rspack_import_189 = __webpack_require__(3454);
-/* import */ var _src_prediction_myriad_js__rspack_import_190 = __webpack_require__(2244);
-/* import */ var _src_prediction_opinion_js__rspack_import_191 = __webpack_require__(2478);
-/* import */ var _src_prediction_polymarket_js__rspack_import_192 = __webpack_require__(7348);
-/* import */ var _src_prediction_predictfun_js__rspack_import_193 = __webpack_require__(4884);
-/* import */ var _src_prediction_sxbet_js__rspack_import_194 = __webpack_require__(2214);
+/* import */ var _src_t7x_js__rspack_import_100 = __webpack_require__(7047);
+/* import */ var _src_tokocrypto_js__rspack_import_101 = __webpack_require__(9660);
+/* import */ var _src_toobit_js__rspack_import_102 = __webpack_require__(7939);
+/* import */ var _src_upbit_js__rspack_import_103 = __webpack_require__(1692);
+/* import */ var _src_weex_js__rspack_import_104 = __webpack_require__(4691);
+/* import */ var _src_whitebit_js__rspack_import_105 = __webpack_require__(410);
+/* import */ var _src_woo_js__rspack_import_106 = __webpack_require__(4615);
+/* import */ var _src_woofipro_js__rspack_import_107 = __webpack_require__(6499);
+/* import */ var _src_xt_js__rspack_import_108 = __webpack_require__(1434);
+/* import */ var _src_zaif_js__rspack_import_109 = __webpack_require__(100);
+/* import */ var _src_zebpay_js__rspack_import_110 = __webpack_require__(307);
+/* import */ var _src_pro_alpaca_js__rspack_import_111 = __webpack_require__(292);
+/* import */ var _src_pro_apex_js__rspack_import_112 = __webpack_require__(9222);
+/* import */ var _src_pro_aster_js__rspack_import_113 = __webpack_require__(8443);
+/* import */ var _src_pro_backpack_js__rspack_import_114 = __webpack_require__(6476);
+/* import */ var _src_pro_bequant_js__rspack_import_115 = __webpack_require__(5284);
+/* import */ var _src_pro_binance_js__rspack_import_116 = __webpack_require__(7802);
+/* import */ var _src_pro_binancecoinm_js__rspack_import_117 = __webpack_require__(4264);
+/* import */ var _src_pro_binanceus_js__rspack_import_118 = __webpack_require__(3402);
+/* import */ var _src_pro_binanceusdm_js__rspack_import_119 = __webpack_require__(905);
+/* import */ var _src_pro_bingx_js__rspack_import_120 = __webpack_require__(9926);
+/* import */ var _src_pro_bitfinex_js__rspack_import_121 = __webpack_require__(5019);
+/* import */ var _src_pro_bitget_js__rspack_import_122 = __webpack_require__(1179);
+/* import */ var _src_pro_bithumb_js__rspack_import_123 = __webpack_require__(479);
+/* import */ var _src_pro_bitopro_js__rspack_import_124 = __webpack_require__(5707);
+/* import */ var _src_pro_bitrue_js__rspack_import_125 = __webpack_require__(7363);
+/* import */ var _src_pro_bitstamp_js__rspack_import_126 = __webpack_require__(2652);
+/* import */ var _src_pro_bittrade_js__rspack_import_127 = __webpack_require__(85);
+/* import */ var _src_pro_bitvavo_js__rspack_import_128 = __webpack_require__(6385);
+/* import */ var _src_pro_blockchaincom_js__rspack_import_129 = __webpack_require__(9343);
+/* import */ var _src_pro_blofin_js__rspack_import_130 = __webpack_require__(270);
+/* import */ var _src_pro_bullish_js__rspack_import_131 = __webpack_require__(7755);
+/* import */ var _src_pro_bybit_js__rspack_import_132 = __webpack_require__(7832);
+/* import */ var _src_pro_bybiteu_js__rspack_import_133 = __webpack_require__(5538);
+/* import */ var _src_pro_bybitid_js__rspack_import_134 = __webpack_require__(9301);
+/* import */ var _src_pro_bydfi_js__rspack_import_135 = __webpack_require__(338);
+/* import */ var _src_pro_cex_js__rspack_import_136 = __webpack_require__(6340);
+/* import */ var _src_pro_coinbase_js__rspack_import_137 = __webpack_require__(3434);
+/* import */ var _src_pro_coinbaseexchange_js__rspack_import_138 = __webpack_require__(4867);
+/* import */ var _src_pro_coinbaseinternational_js__rspack_import_139 = __webpack_require__(2896);
+/* import */ var _src_pro_coincheck_js__rspack_import_140 = __webpack_require__(8951);
+/* import */ var _src_pro_coinone_js__rspack_import_141 = __webpack_require__(7087);
+/* import */ var _src_pro_cryptocom_js__rspack_import_142 = __webpack_require__(8202);
+/* import */ var _src_pro_deepcoin_js__rspack_import_143 = __webpack_require__(1837);
+/* import */ var _src_pro_deribit_js__rspack_import_144 = __webpack_require__(673);
+/* import */ var _src_pro_derive_js__rspack_import_145 = __webpack_require__(3253);
+/* import */ var _src_pro_dydx_js__rspack_import_146 = __webpack_require__(9601);
+/* import */ var _src_pro_extended_js__rspack_import_147 = __webpack_require__(9195);
+/* import */ var _src_pro_gate_js__rspack_import_148 = __webpack_require__(2541);
+/* import */ var _src_pro_gateeu_js__rspack_import_149 = __webpack_require__(2227);
+/* import */ var _src_pro_gemini_js__rspack_import_150 = __webpack_require__(4453);
+/* import */ var _src_pro_grvt_js__rspack_import_151 = __webpack_require__(9193);
+/* import */ var _src_pro_hashkey_js__rspack_import_152 = __webpack_require__(5915);
+/* import */ var _src_pro_hitbtc_js__rspack_import_153 = __webpack_require__(3906);
+/* import */ var _src_pro_hollaex_js__rspack_import_154 = __webpack_require__(293);
+/* import */ var _src_pro_htx_js__rspack_import_155 = __webpack_require__(2404);
+/* import */ var _src_pro_hyperliquid_js__rspack_import_156 = __webpack_require__(8334);
+/* import */ var _src_pro_independentreserve_js__rspack_import_157 = __webpack_require__(6164);
+/* import */ var _src_pro_kraken_js__rspack_import_158 = __webpack_require__(4400);
+/* import */ var _src_pro_krakenfutures_js__rspack_import_159 = __webpack_require__(3690);
+/* import */ var _src_pro_kucoin_js__rspack_import_160 = __webpack_require__(4427);
+/* import */ var _src_pro_kucoinfutures_js__rspack_import_161 = __webpack_require__(6335);
+/* import */ var _src_pro_lbank_js__rspack_import_162 = __webpack_require__(5409);
+/* import */ var _src_pro_lighter_js__rspack_import_163 = __webpack_require__(975);
+/* import */ var _src_pro_luno_js__rspack_import_164 = __webpack_require__(2678);
+/* import */ var _src_pro_mexc_js__rspack_import_165 = __webpack_require__(941);
+/* import */ var _src_pro_modetrade_js__rspack_import_166 = __webpack_require__(5931);
+/* import */ var _src_pro_mudrex_js__rspack_import_167 = __webpack_require__(9671);
+/* import */ var _src_pro_myokx_js__rspack_import_168 = __webpack_require__(2472);
+/* import */ var _src_pro_nado_js__rspack_import_169 = __webpack_require__(2934);
+/* import */ var _src_pro_ndax_js__rspack_import_170 = __webpack_require__(4825);
+/* import */ var _src_pro_okx_js__rspack_import_171 = __webpack_require__(4302);
+/* import */ var _src_pro_okxus_js__rspack_import_172 = __webpack_require__(9302);
+/* import */ var _src_pro_onetrading_js__rspack_import_173 = __webpack_require__(1503);
+/* import */ var _src_pro_p2b_js__rspack_import_174 = __webpack_require__(9304);
+/* import */ var _src_pro_pacifica_js__rspack_import_175 = __webpack_require__(3100);
+/* import */ var _src_pro_paradex_js__rspack_import_176 = __webpack_require__(2935);
+/* import */ var _src_pro_phemex_js__rspack_import_177 = __webpack_require__(8009);
+/* import */ var _src_pro_poloniex_js__rspack_import_178 = __webpack_require__(1818);
+/* import */ var _src_pro_polymarket_js__rspack_import_179 = __webpack_require__(7292);
+/* import */ var _src_pro_t7x_js__rspack_import_180 = __webpack_require__(2011);
+/* import */ var _src_pro_toobit_js__rspack_import_181 = __webpack_require__(3039);
+/* import */ var _src_pro_upbit_js__rspack_import_182 = __webpack_require__(3296);
+/* import */ var _src_pro_weex_js__rspack_import_183 = __webpack_require__(7095);
+/* import */ var _src_pro_whitebit_js__rspack_import_184 = __webpack_require__(3990);
+/* import */ var _src_pro_woo_js__rspack_import_185 = __webpack_require__(3363);
+/* import */ var _src_pro_woofipro_js__rspack_import_186 = __webpack_require__(5959);
+/* import */ var _src_pro_xt_js__rspack_import_187 = __webpack_require__(846);
+/* import */ var _src_prediction_binance_js__rspack_import_188 = __webpack_require__(1538);
+/* import */ var _src_prediction_hyperliquid_js__rspack_import_189 = __webpack_require__(6470);
+/* import */ var _src_prediction_kalshi_js__rspack_import_190 = __webpack_require__(7788);
+/* import */ var _src_prediction_limitless_js__rspack_import_191 = __webpack_require__(3454);
+/* import */ var _src_prediction_myriad_js__rspack_import_192 = __webpack_require__(2244);
+/* import */ var _src_prediction_opinion_js__rspack_import_193 = __webpack_require__(2478);
+/* import */ var _src_prediction_polymarket_js__rspack_import_194 = __webpack_require__(7348);
+/* import */ var _src_prediction_predictfun_js__rspack_import_195 = __webpack_require__(4884);
+/* import */ var _src_prediction_sxbet_js__rspack_import_196 = __webpack_require__(2214);
 /*
 
 MIT License
@@ -689347,6 +689712,7 @@ SOFTWARE.
 // this is updated by vss.js when building
 const version = '4.5.90';
 //-----------------------------------------------------------------------------
+
 
 
 
@@ -689537,6 +689903,7 @@ const version = '4.5.90';
 
 
 
+
 const exchanges = {
     'alpaca': _src_alpaca_js__rspack_import_6/* ["default"] */.A,
     'apex': _src_apex_js__rspack_import_7/* ["default"] */.A,
@@ -689632,108 +689999,110 @@ const exchanges = {
     'poloniex': _src_poloniex_js__rspack_import_97/* ["default"] */.A,
     'polymarket': _src_polymarket_js__rspack_import_98/* ["default"] */.A,
     'revolutx': _src_revolutx_js__rspack_import_99/* ["default"] */.A,
-    'tokocrypto': _src_tokocrypto_js__rspack_import_100/* ["default"] */.A,
-    'toobit': _src_toobit_js__rspack_import_101/* ["default"] */.A,
-    'upbit': _src_upbit_js__rspack_import_102/* ["default"] */.A,
-    'weex': _src_weex_js__rspack_import_103/* ["default"] */.A,
-    'whitebit': _src_whitebit_js__rspack_import_104/* ["default"] */.A,
-    'woo': _src_woo_js__rspack_import_105/* ["default"] */.A,
-    'woofipro': _src_woofipro_js__rspack_import_106/* ["default"] */.A,
-    'xt': _src_xt_js__rspack_import_107/* ["default"] */.A,
-    'zaif': _src_zaif_js__rspack_import_108/* ["default"] */.A,
-    'zebpay': _src_zebpay_js__rspack_import_109/* ["default"] */.A
+    't7x': _src_t7x_js__rspack_import_100/* ["default"] */.A,
+    'tokocrypto': _src_tokocrypto_js__rspack_import_101/* ["default"] */.A,
+    'toobit': _src_toobit_js__rspack_import_102/* ["default"] */.A,
+    'upbit': _src_upbit_js__rspack_import_103/* ["default"] */.A,
+    'weex': _src_weex_js__rspack_import_104/* ["default"] */.A,
+    'whitebit': _src_whitebit_js__rspack_import_105/* ["default"] */.A,
+    'woo': _src_woo_js__rspack_import_106/* ["default"] */.A,
+    'woofipro': _src_woofipro_js__rspack_import_107/* ["default"] */.A,
+    'xt': _src_xt_js__rspack_import_108/* ["default"] */.A,
+    'zaif': _src_zaif_js__rspack_import_109/* ["default"] */.A,
+    'zebpay': _src_zebpay_js__rspack_import_110/* ["default"] */.A
 };
 const pro = {
-    'alpaca': _src_pro_alpaca_js__rspack_import_110/* ["default"] */.A,
-    'apex': _src_pro_apex_js__rspack_import_111/* ["default"] */.A,
-    'aster': _src_pro_aster_js__rspack_import_112/* ["default"] */.A,
-    'backpack': _src_pro_backpack_js__rspack_import_113/* ["default"] */.A,
-    'bequant': _src_pro_bequant_js__rspack_import_114/* ["default"] */.A,
-    'binance': _src_pro_binance_js__rspack_import_115/* ["default"] */.A,
-    'binancecoinm': _src_pro_binancecoinm_js__rspack_import_116/* ["default"] */.A,
-    'binanceus': _src_pro_binanceus_js__rspack_import_117/* ["default"] */.A,
-    'binanceusdm': _src_pro_binanceusdm_js__rspack_import_118/* ["default"] */.A,
-    'bingx': _src_pro_bingx_js__rspack_import_119/* ["default"] */.A,
-    'bitfinex': _src_pro_bitfinex_js__rspack_import_120/* ["default"] */.A,
-    'bitget': _src_pro_bitget_js__rspack_import_121/* ["default"] */.A,
-    'bithumb': _src_pro_bithumb_js__rspack_import_122/* ["default"] */.A,
-    'bitopro': _src_pro_bitopro_js__rspack_import_123/* ["default"] */.A,
-    'bitrue': _src_pro_bitrue_js__rspack_import_124/* ["default"] */.A,
-    'bitstamp': _src_pro_bitstamp_js__rspack_import_125/* ["default"] */.A,
-    'bittrade': _src_pro_bittrade_js__rspack_import_126/* ["default"] */.A,
-    'bitvavo': _src_pro_bitvavo_js__rspack_import_127/* ["default"] */.A,
-    'blockchaincom': _src_pro_blockchaincom_js__rspack_import_128/* ["default"] */.A,
-    'blofin': _src_pro_blofin_js__rspack_import_129/* ["default"] */.A,
-    'bullish': _src_pro_bullish_js__rspack_import_130/* ["default"] */.A,
-    'bybit': _src_pro_bybit_js__rspack_import_131/* ["default"] */.A,
-    'bybiteu': _src_pro_bybiteu_js__rspack_import_132/* ["default"] */.A,
-    'bybitid': _src_pro_bybitid_js__rspack_import_133/* ["default"] */.A,
-    'bydfi': _src_pro_bydfi_js__rspack_import_134/* ["default"] */.A,
-    'cex': _src_pro_cex_js__rspack_import_135/* ["default"] */.A,
-    'coinbase': _src_pro_coinbase_js__rspack_import_136/* ["default"] */.A,
-    'coinbaseexchange': _src_pro_coinbaseexchange_js__rspack_import_137/* ["default"] */.A,
-    'coinbaseinternational': _src_pro_coinbaseinternational_js__rspack_import_138/* ["default"] */.A,
-    'coincheck': _src_pro_coincheck_js__rspack_import_139/* ["default"] */.A,
-    'coinone': _src_pro_coinone_js__rspack_import_140/* ["default"] */.A,
-    'cryptocom': _src_pro_cryptocom_js__rspack_import_141/* ["default"] */.A,
-    'deepcoin': _src_pro_deepcoin_js__rspack_import_142/* ["default"] */.A,
-    'deribit': _src_pro_deribit_js__rspack_import_143/* ["default"] */.A,
-    'derive': _src_pro_derive_js__rspack_import_144/* ["default"] */.A,
-    'dydx': _src_pro_dydx_js__rspack_import_145/* ["default"] */.A,
-    'extended': _src_pro_extended_js__rspack_import_146/* ["default"] */.A,
-    'gate': _src_pro_gate_js__rspack_import_147/* ["default"] */.A,
-    'gateeu': _src_pro_gateeu_js__rspack_import_148/* ["default"] */.A,
-    'gemini': _src_pro_gemini_js__rspack_import_149/* ["default"] */.A,
-    'grvt': _src_pro_grvt_js__rspack_import_150/* ["default"] */.A,
-    'hashkey': _src_pro_hashkey_js__rspack_import_151/* ["default"] */.A,
-    'hitbtc': _src_pro_hitbtc_js__rspack_import_152/* ["default"] */.A,
-    'hollaex': _src_pro_hollaex_js__rspack_import_153/* ["default"] */.A,
-    'htx': _src_pro_htx_js__rspack_import_154/* ["default"] */.A,
-    'hyperliquid': _src_pro_hyperliquid_js__rspack_import_155/* ["default"] */.A,
-    'independentreserve': _src_pro_independentreserve_js__rspack_import_156/* ["default"] */.A,
-    'kraken': _src_pro_kraken_js__rspack_import_157/* ["default"] */.A,
-    'krakenfutures': _src_pro_krakenfutures_js__rspack_import_158/* ["default"] */.A,
-    'kucoin': _src_pro_kucoin_js__rspack_import_159/* ["default"] */.A,
-    'kucoinfutures': _src_pro_kucoinfutures_js__rspack_import_160/* ["default"] */.A,
-    'lbank': _src_pro_lbank_js__rspack_import_161/* ["default"] */.A,
-    'lighter': _src_pro_lighter_js__rspack_import_162/* ["default"] */.A,
-    'luno': _src_pro_luno_js__rspack_import_163/* ["default"] */.A,
-    'mexc': _src_pro_mexc_js__rspack_import_164/* ["default"] */.A,
-    'modetrade': _src_pro_modetrade_js__rspack_import_165/* ["default"] */.A,
-    'mudrex': _src_pro_mudrex_js__rspack_import_166/* ["default"] */.A,
-    'myokx': _src_pro_myokx_js__rspack_import_167/* ["default"] */.A,
-    'nado': _src_pro_nado_js__rspack_import_168/* ["default"] */.A,
-    'ndax': _src_pro_ndax_js__rspack_import_169/* ["default"] */.A,
-    'okx': _src_pro_okx_js__rspack_import_170/* ["default"] */.A,
-    'okxus': _src_pro_okxus_js__rspack_import_171/* ["default"] */.A,
-    'onetrading': _src_pro_onetrading_js__rspack_import_172/* ["default"] */.A,
-    'p2b': _src_pro_p2b_js__rspack_import_173/* ["default"] */.A,
-    'pacifica': _src_pro_pacifica_js__rspack_import_174/* ["default"] */.A,
-    'paradex': _src_pro_paradex_js__rspack_import_175/* ["default"] */.A,
-    'phemex': _src_pro_phemex_js__rspack_import_176/* ["default"] */.A,
-    'poloniex': _src_pro_poloniex_js__rspack_import_177/* ["default"] */.A,
-    'polymarket': _src_pro_polymarket_js__rspack_import_178/* ["default"] */.A,
-    'toobit': _src_pro_toobit_js__rspack_import_179/* ["default"] */.A,
-    'upbit': _src_pro_upbit_js__rspack_import_180/* ["default"] */.A,
-    'weex': _src_pro_weex_js__rspack_import_181/* ["default"] */.A,
-    'whitebit': _src_pro_whitebit_js__rspack_import_182/* ["default"] */.A,
-    'woo': _src_pro_woo_js__rspack_import_183/* ["default"] */.A,
-    'woofipro': _src_pro_woofipro_js__rspack_import_184/* ["default"] */.A,
-    'xt': _src_pro_xt_js__rspack_import_185/* ["default"] */.A
+    'alpaca': _src_pro_alpaca_js__rspack_import_111/* ["default"] */.A,
+    'apex': _src_pro_apex_js__rspack_import_112/* ["default"] */.A,
+    'aster': _src_pro_aster_js__rspack_import_113/* ["default"] */.A,
+    'backpack': _src_pro_backpack_js__rspack_import_114/* ["default"] */.A,
+    'bequant': _src_pro_bequant_js__rspack_import_115/* ["default"] */.A,
+    'binance': _src_pro_binance_js__rspack_import_116/* ["default"] */.A,
+    'binancecoinm': _src_pro_binancecoinm_js__rspack_import_117/* ["default"] */.A,
+    'binanceus': _src_pro_binanceus_js__rspack_import_118/* ["default"] */.A,
+    'binanceusdm': _src_pro_binanceusdm_js__rspack_import_119/* ["default"] */.A,
+    'bingx': _src_pro_bingx_js__rspack_import_120/* ["default"] */.A,
+    'bitfinex': _src_pro_bitfinex_js__rspack_import_121/* ["default"] */.A,
+    'bitget': _src_pro_bitget_js__rspack_import_122/* ["default"] */.A,
+    'bithumb': _src_pro_bithumb_js__rspack_import_123/* ["default"] */.A,
+    'bitopro': _src_pro_bitopro_js__rspack_import_124/* ["default"] */.A,
+    'bitrue': _src_pro_bitrue_js__rspack_import_125/* ["default"] */.A,
+    'bitstamp': _src_pro_bitstamp_js__rspack_import_126/* ["default"] */.A,
+    'bittrade': _src_pro_bittrade_js__rspack_import_127/* ["default"] */.A,
+    'bitvavo': _src_pro_bitvavo_js__rspack_import_128/* ["default"] */.A,
+    'blockchaincom': _src_pro_blockchaincom_js__rspack_import_129/* ["default"] */.A,
+    'blofin': _src_pro_blofin_js__rspack_import_130/* ["default"] */.A,
+    'bullish': _src_pro_bullish_js__rspack_import_131/* ["default"] */.A,
+    'bybit': _src_pro_bybit_js__rspack_import_132/* ["default"] */.A,
+    'bybiteu': _src_pro_bybiteu_js__rspack_import_133/* ["default"] */.A,
+    'bybitid': _src_pro_bybitid_js__rspack_import_134/* ["default"] */.A,
+    'bydfi': _src_pro_bydfi_js__rspack_import_135/* ["default"] */.A,
+    'cex': _src_pro_cex_js__rspack_import_136/* ["default"] */.A,
+    'coinbase': _src_pro_coinbase_js__rspack_import_137/* ["default"] */.A,
+    'coinbaseexchange': _src_pro_coinbaseexchange_js__rspack_import_138/* ["default"] */.A,
+    'coinbaseinternational': _src_pro_coinbaseinternational_js__rspack_import_139/* ["default"] */.A,
+    'coincheck': _src_pro_coincheck_js__rspack_import_140/* ["default"] */.A,
+    'coinone': _src_pro_coinone_js__rspack_import_141/* ["default"] */.A,
+    'cryptocom': _src_pro_cryptocom_js__rspack_import_142/* ["default"] */.A,
+    'deepcoin': _src_pro_deepcoin_js__rspack_import_143/* ["default"] */.A,
+    'deribit': _src_pro_deribit_js__rspack_import_144/* ["default"] */.A,
+    'derive': _src_pro_derive_js__rspack_import_145/* ["default"] */.A,
+    'dydx': _src_pro_dydx_js__rspack_import_146/* ["default"] */.A,
+    'extended': _src_pro_extended_js__rspack_import_147/* ["default"] */.A,
+    'gate': _src_pro_gate_js__rspack_import_148/* ["default"] */.A,
+    'gateeu': _src_pro_gateeu_js__rspack_import_149/* ["default"] */.A,
+    'gemini': _src_pro_gemini_js__rspack_import_150/* ["default"] */.A,
+    'grvt': _src_pro_grvt_js__rspack_import_151/* ["default"] */.A,
+    'hashkey': _src_pro_hashkey_js__rspack_import_152/* ["default"] */.A,
+    'hitbtc': _src_pro_hitbtc_js__rspack_import_153/* ["default"] */.A,
+    'hollaex': _src_pro_hollaex_js__rspack_import_154/* ["default"] */.A,
+    'htx': _src_pro_htx_js__rspack_import_155/* ["default"] */.A,
+    'hyperliquid': _src_pro_hyperliquid_js__rspack_import_156/* ["default"] */.A,
+    'independentreserve': _src_pro_independentreserve_js__rspack_import_157/* ["default"] */.A,
+    'kraken': _src_pro_kraken_js__rspack_import_158/* ["default"] */.A,
+    'krakenfutures': _src_pro_krakenfutures_js__rspack_import_159/* ["default"] */.A,
+    'kucoin': _src_pro_kucoin_js__rspack_import_160/* ["default"] */.A,
+    'kucoinfutures': _src_pro_kucoinfutures_js__rspack_import_161/* ["default"] */.A,
+    'lbank': _src_pro_lbank_js__rspack_import_162/* ["default"] */.A,
+    'lighter': _src_pro_lighter_js__rspack_import_163/* ["default"] */.A,
+    'luno': _src_pro_luno_js__rspack_import_164/* ["default"] */.A,
+    'mexc': _src_pro_mexc_js__rspack_import_165/* ["default"] */.A,
+    'modetrade': _src_pro_modetrade_js__rspack_import_166/* ["default"] */.A,
+    'mudrex': _src_pro_mudrex_js__rspack_import_167/* ["default"] */.A,
+    'myokx': _src_pro_myokx_js__rspack_import_168/* ["default"] */.A,
+    'nado': _src_pro_nado_js__rspack_import_169/* ["default"] */.A,
+    'ndax': _src_pro_ndax_js__rspack_import_170/* ["default"] */.A,
+    'okx': _src_pro_okx_js__rspack_import_171/* ["default"] */.A,
+    'okxus': _src_pro_okxus_js__rspack_import_172/* ["default"] */.A,
+    'onetrading': _src_pro_onetrading_js__rspack_import_173/* ["default"] */.A,
+    'p2b': _src_pro_p2b_js__rspack_import_174/* ["default"] */.A,
+    'pacifica': _src_pro_pacifica_js__rspack_import_175/* ["default"] */.A,
+    'paradex': _src_pro_paradex_js__rspack_import_176/* ["default"] */.A,
+    'phemex': _src_pro_phemex_js__rspack_import_177/* ["default"] */.A,
+    'poloniex': _src_pro_poloniex_js__rspack_import_178/* ["default"] */.A,
+    'polymarket': _src_pro_polymarket_js__rspack_import_179/* ["default"] */.A,
+    't7x': _src_pro_t7x_js__rspack_import_180/* ["default"] */.A,
+    'toobit': _src_pro_toobit_js__rspack_import_181/* ["default"] */.A,
+    'upbit': _src_pro_upbit_js__rspack_import_182/* ["default"] */.A,
+    'weex': _src_pro_weex_js__rspack_import_183/* ["default"] */.A,
+    'whitebit': _src_pro_whitebit_js__rspack_import_184/* ["default"] */.A,
+    'woo': _src_pro_woo_js__rspack_import_185/* ["default"] */.A,
+    'woofipro': _src_pro_woofipro_js__rspack_import_186/* ["default"] */.A,
+    'xt': _src_pro_xt_js__rspack_import_187/* ["default"] */.A
 };
 pro.exchanges = Object.keys(pro);
 pro['Exchange'] = _src_base_Exchange_js__rspack_import_0/* .Exchange */.k5; // now the same for rest and ts
 //-----------------------------------------------------------------------------
 const prediction = {
-    'binance': _src_prediction_binance_js__rspack_import_186/* ["default"] */.A,
-    'hyperliquid': _src_prediction_hyperliquid_js__rspack_import_187/* ["default"] */.A,
-    'kalshi': _src_prediction_kalshi_js__rspack_import_188/* ["default"] */.A,
-    'limitless': _src_prediction_limitless_js__rspack_import_189/* ["default"] */.A,
-    'myriad': _src_prediction_myriad_js__rspack_import_190/* ["default"] */.A,
-    'opinion': _src_prediction_opinion_js__rspack_import_191/* ["default"] */.A,
-    'polymarket': _src_prediction_polymarket_js__rspack_import_192/* ["default"] */.A,
-    'predictfun': _src_prediction_predictfun_js__rspack_import_193/* ["default"] */.A,
-    'sxbet': _src_prediction_sxbet_js__rspack_import_194/* ["default"] */.A
+    'binance': _src_prediction_binance_js__rspack_import_188/* ["default"] */.A,
+    'hyperliquid': _src_prediction_hyperliquid_js__rspack_import_189/* ["default"] */.A,
+    'kalshi': _src_prediction_kalshi_js__rspack_import_190/* ["default"] */.A,
+    'limitless': _src_prediction_limitless_js__rspack_import_191/* ["default"] */.A,
+    'myriad': _src_prediction_myriad_js__rspack_import_192/* ["default"] */.A,
+    'opinion': _src_prediction_opinion_js__rspack_import_193/* ["default"] */.A,
+    'polymarket': _src_prediction_polymarket_js__rspack_import_194/* ["default"] */.A,
+    'predictfun': _src_prediction_predictfun_js__rspack_import_195/* ["default"] */.A,
+    'sxbet': _src_prediction_sxbet_js__rspack_import_196/* ["default"] */.A
 };
 prediction.exchanges = Object.keys(prediction);
 // the namespace's `Exchange` alias must be the prediction base, not the crypto Exchange —
@@ -689897,16 +690266,17 @@ __webpack_require__.d(__webpack_exports__, {
   poloniex: () => (/* reexport safe */ _src_poloniex_js__rspack_import_97.A),
   polymarket: () => (/* reexport safe */ _src_polymarket_js__rspack_import_98.A),
   revolutx: () => (/* reexport safe */ _src_revolutx_js__rspack_import_99.A),
-  tokocrypto: () => (/* reexport safe */ _src_tokocrypto_js__rspack_import_100.A),
-  toobit: () => (/* reexport safe */ _src_toobit_js__rspack_import_101.A),
-  upbit: () => (/* reexport safe */ _src_upbit_js__rspack_import_102.A),
-  weex: () => (/* reexport safe */ _src_weex_js__rspack_import_103.A),
-  whitebit: () => (/* reexport safe */ _src_whitebit_js__rspack_import_104.A),
-  woo: () => (/* reexport safe */ _src_woo_js__rspack_import_105.A),
-  woofipro: () => (/* reexport safe */ _src_woofipro_js__rspack_import_106.A),
-  xt: () => (/* reexport safe */ _src_xt_js__rspack_import_107.A),
-  zaif: () => (/* reexport safe */ _src_zaif_js__rspack_import_108.A),
-  zebpay: () => (/* reexport safe */ _src_zebpay_js__rspack_import_109.A)
+  t7x: () => (/* reexport safe */ _src_t7x_js__rspack_import_100.A),
+  tokocrypto: () => (/* reexport safe */ _src_tokocrypto_js__rspack_import_101.A),
+  toobit: () => (/* reexport safe */ _src_toobit_js__rspack_import_102.A),
+  upbit: () => (/* reexport safe */ _src_upbit_js__rspack_import_103.A),
+  weex: () => (/* reexport safe */ _src_weex_js__rspack_import_104.A),
+  whitebit: () => (/* reexport safe */ _src_whitebit_js__rspack_import_105.A),
+  woo: () => (/* reexport safe */ _src_woo_js__rspack_import_106.A),
+  woofipro: () => (/* reexport safe */ _src_woofipro_js__rspack_import_107.A),
+  xt: () => (/* reexport safe */ _src_xt_js__rspack_import_108.A),
+  zaif: () => (/* reexport safe */ _src_zaif_js__rspack_import_109.A),
+  zebpay: () => (/* reexport safe */ _src_zebpay_js__rspack_import_110.A)
 }, {
   "default": __rspack_default_export,
   exchanges: exchanges,

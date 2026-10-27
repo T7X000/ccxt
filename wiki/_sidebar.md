@@ -96,6 +96,7 @@
 	- [poloniex](exchanges/poloniex.md)
 	- [polymarket](exchanges/polymarket.md)
 	- [revolutx](exchanges/revolutx.md)
+	- [t7x](exchanges/t7x.md)
 	- [tokocrypto](exchanges/tokocrypto.md)
 	- [toobit](exchanges/toobit.md)
 	- [upbit](exchanges/upbit.md)

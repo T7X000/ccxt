@@ -214,6 +214,9 @@ func DynamicallyCreateInstance(exchangeId string, exchangeArgs map[string]any) (
 	case "polymarket":
 		polymarketItf := NewPolymarket(exchangeArgs)
 		return polymarketItf, true
+	case "t7x":
+		t7xItf := NewT7x(exchangeArgs)
+		return t7xItf, true
 	case "toobit":
 		toobitItf := NewToobit(exchangeArgs)
 		return toobitItf, true

@@ -104,6 +104,7 @@ var phemex = require('./src/phemex.js');
 var poloniex = require('./src/poloniex.js');
 var polymarket = require('./src/polymarket.js');
 var revolutx = require('./src/revolutx.js');
+var t7x = require('./src/t7x.js');
 var tokocrypto = require('./src/tokocrypto.js');
 var toobit = require('./src/toobit.js');
 var upbit = require('./src/upbit.js');
@@ -183,6 +184,7 @@ var paradex$1 = require('./src/pro/paradex.js');
 var phemex$1 = require('./src/pro/phemex.js');
 var poloniex$1 = require('./src/pro/poloniex.js');
 var polymarket$1 = require('./src/pro/polymarket.js');
+var t7x$1 = require('./src/pro/t7x.js');
 var toobit$1 = require('./src/pro/toobit.js');
 var upbit$1 = require('./src/pro/upbit.js');
 var weex$1 = require('./src/pro/weex.js');
@@ -298,6 +300,7 @@ const exchanges = {
     'poloniex': poloniex["default"],
     'polymarket': polymarket["default"],
     'revolutx': revolutx["default"],
+    't7x': t7x["default"],
     'tokocrypto': tokocrypto["default"],
     'toobit': toobit["default"],
     'upbit': upbit["default"],
@@ -379,6 +382,7 @@ const pro = {
     'phemex': phemex$1["default"],
     'poloniex': poloniex$1["default"],
     'polymarket': polymarket$1["default"],
+    't7x': t7x$1["default"],
     'toobit': toobit$1["default"],
     'upbit': upbit$1["default"],
     'weex': weex$1["default"],
@@ -551,6 +555,7 @@ exports.phemex = phemex["default"];
 exports.poloniex = poloniex["default"];
 exports.polymarket = polymarket["default"];
 exports.revolutx = revolutx["default"];
+exports.t7x = t7x["default"];
 exports.tokocrypto = tokocrypto["default"];
 exports.toobit = toobit["default"];
 exports.upbit = upbit["default"];

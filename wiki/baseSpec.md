@@ -7524,6 +7524,28 @@ set user abstraction mode
 
 ---
 
+<a name="sign" id="sign"></a>
+
+## sign
+T7X request signing, replaces the inherited ndax#sign
+
+**Kind**: instance   
+**Returns**: <code>Dict</code> - the signed authentication request headers
+starts as a copy of ndax#sign, change it to match T7X's authentication
+
+
+| Param | Type | Description |
+| --- | --- | --- |
+| path | <code>string</code> | the endpoint path |
+| api | <code>Array&lt;string&gt;</code> | the api name, ['public'] or ['private'] |
+| method | <code>string</code> | the HTTP method |
+| params | <code>Dict</code> | the request params |
+
+##### Supported exchanges
+* [t7x](/exchanges/t7x.md#sign)
+
+---
+
 <a name="signIn" id="signin"></a>
 
 ## signIn
@@ -7542,6 +7564,7 @@ sign in, must be called prior to using other authenticated methods
 * [bullish](/exchanges/bullish.md#signin)
 * [grvt](/exchanges/grvt.md#signin)
 * [ndax](/exchanges/ndax.md#signin)
+* [t7x](/exchanges/t7x.md#signin)
 
 ---
 

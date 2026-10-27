@@ -291,6 +291,9 @@ func DynamicallyCreateInstance(exchangeId string, exchangeArgs map[string]any) (
 	case "revolutx":
 		revolutxItf := NewRevolutx(exchangeArgs)
 		return revolutxItf, true
+	case "t7x":
+		t7xItf := NewT7x(exchangeArgs)
+		return t7xItf, true
 	case "tokocrypto":
 		tokocryptoItf := NewTokocrypto(exchangeArgs)
 		return tokocryptoItf, true

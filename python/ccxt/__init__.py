@@ -179,6 +179,7 @@ from ccxt.phemex import phemex                                        # noqa: F4
 from ccxt.poloniex import poloniex                                    # noqa: F401
 from ccxt.polymarket import polymarket                                # noqa: F401
 from ccxt.revolutx import revolutx                                    # noqa: F401
+from ccxt.t7x import t7x                                              # noqa: F401
 from ccxt.tokocrypto import tokocrypto                                # noqa: F401
 from ccxt.toobit import toobit                                        # noqa: F401
 from ccxt.upbit import upbit                                          # noqa: F401
@@ -285,6 +286,7 @@ exchanges = [
     'poloniex',
     'polymarket',
     'revolutx',
+    't7x',
     'tokocrypto',
     'toobit',
     'upbit',

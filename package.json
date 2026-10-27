@@ -343,7 +343,7 @@
     "replace-in-file": "^6.3.5",
     "rollup": "^2.70.1",
     "rollup-plugin-execute": "1.1.1",
-    "tsx": "^4.22.4",
+    "tsx": "^4.23.15",
     "typescript": "7.0.2",
     "typescript6": "npm:typescript@6.0.3"
   },
