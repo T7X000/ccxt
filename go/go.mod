@@ -1,4 +1,4 @@
-module github.com/T7X000/ccxt/go
+module github.com/ccxt/ccxt/go
 
 go 1.25.0
 
