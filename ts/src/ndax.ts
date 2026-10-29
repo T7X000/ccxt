@@ -689,14 +689,8 @@ export default class ndax extends Exchange {
     override parseOrderBook (orderbook: any, symbol: any, timestamp: Int = undefined, bidsKey = 'bids', asksKey = 'asks', priceKey:IndexType = 6, amountKey:IndexType = 8, countOrIdKey: IndexType = 2) {
         let nonce = this.safeInteger (this.safeList (orderbook, 0), 0);
         let latestTimestamp = this.safeInteger ([ timestamp ], 0);
-        const result: Dict = {
-            'symbol': symbol,
-            'bids': [],
-            'asks': [],
-            'timestamp': undefined,
-            'datetime': undefined,
-            'nonce': undefined,
-        };
+        const bids = [];
+        const asks = [];
         for (let i = 0; i < orderbook.length; i++) {
             const level = orderbook[i];
             const newTimestamp = this.safeInteger (level, 2);
@@ -709,14 +703,20 @@ export default class ndax extends Exchange {
             }
             const bidask = this.parseOrderBookBidAsk (level, priceKey, amountKey);
             const levelSide = this.safeInteger (level, 9);
-            const side = (levelSide !== undefined && levelSide !== 0) ? asksKey : bidsKey;
-            result[side].push (bidask);
+            if ((levelSide !== undefined) && (levelSide !== 0)) {
+                asks.push (bidask);
+            } else {
+                bids.push (bidask);
+            }
         }
-        result['bids'] = this.sortBy (result['bids'], 0, true);
-        result['asks'] = this.sortBy (result['asks'], 0);
-        result['timestamp'] = latestTimestamp;
-        result['datetime'] = this.iso8601 (latestTimestamp);
-        result['nonce'] = nonce;
+        const result: Dict = {
+            'symbol': symbol,
+            'bids': this.sortBy (bids, 0, true),
+            'asks': this.sortBy (asks, 0),
+            'timestamp': latestTimestamp,
+            'datetime': this.iso8601 (latestTimestamp),
+            'nonce': nonce,
+        };
         return result as OrderBook;
     }
 

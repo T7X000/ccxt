@@ -978,14 +978,8 @@ func (this *Ndax) ParseOrderBook(orderbook any, symbol any, optionalArgs ...any)
 	_ = countOrIdKey
 	var nonce *int64 = this.SafeInteger(this.SafeList(orderbook, 0), 0)
 	var latestTimestamp *int64 = this.SafeInteger([]any{timestamp}, 0)
-	var result map[string]any = map[string]any{
-		"symbol":    symbol,
-		"bids":      []any{},
-		"asks":      []any{},
-		"timestamp": nil,
-		"datetime":  nil,
-		"nonce":     nil,
-	}
+	var bids []any = []any{}
+	var asks []any = []any{}
 	for i := 0; i < GetArrayLength(orderbook); i++ {
 		var level any = GetValue(orderbook, i)
 		var newTimestamp *int64 = this.SafeInteger(level, 2)
@@ -998,20 +992,20 @@ func (this *Ndax) ParseOrderBook(orderbook any, symbol any, optionalArgs ...any)
 		}
 		var bidask any = this.ParseOrderBookBidAsk(level, priceKey, amountKey)
 		var levelSide *int64 = this.SafeInteger(level, 9)
-		var side any = func() any {
-			if (levelSide != nil) && (levelSide == nil || *levelSide != 0) {
-				return asksKey
-			}
-			return bidsKey
-		}()
-		retRes71212 := GetValue(result, side)
-		AppendToArray(&retRes71212, bidask)
+		if (levelSide != nil) && (levelSide == nil || *levelSide != 0) {
+			asks = append(asks, bidask)
+		} else {
+			bids = append(bids, bidask)
+		}
 	}
-	result["bids"] = this.SortBy(result["bids"], 0, true)
-	result["asks"] = this.SortBy(result["asks"], 0)
-	result["timestamp"] = latestTimestamp
-	result["datetime"] = this.Iso8601(latestTimestamp)
-	result["nonce"] = nonce
+	var result map[string]any = map[string]any{
+		"symbol":    symbol,
+		"bids":      this.SortBy(bids, 0, true),
+		"asks":      this.SortBy(asks, 0),
+		"timestamp": latestTimestamp,
+		"datetime":  this.Iso8601(latestTimestamp),
+		"nonce":     nonce,
+	}
 	return MapTyped(result)
 }
 
@@ -1058,11 +1052,11 @@ func (this *Ndax) fetchOrderBookBody(ch chan AsyncResult[OrderBook], symbol stri
 		"Depth":        limitValue,
 	}
 
-	listEp1040 := <-this.PublicGetGetL2Snapshot(this.Extend(request, params))
-	if listEp1040.Err != nil {
-		panic(listEp1040.Err)
+	listEp1034 := <-this.PublicGetGetL2Snapshot(this.Extend(request, params))
+	if listEp1034.Err != nil {
+		panic(listEp1034.Err)
 	}
-	var response []any = listEp1040.Value
+	var response []any = listEp1034.Value
 
 	//
 	//     [
@@ -1205,11 +1199,11 @@ func (this *Ndax) fetchTickersBody(ch chan AsyncResult[map[string]Ticker], optio
 	}
 	var symbolsNormalized []string = this.MarketSymbols(symbols)
 
-	listEp1180 := <-this.PublicGetSummary(params)
-	if listEp1180.Err != nil {
-		panic(listEp1180.Err)
+	listEp1174 := <-this.PublicGetSummary(params)
+	if listEp1174.Err != nil {
+		panic(listEp1174.Err)
 	}
-	var response []any = listEp1180.Value
+	var response []any = listEp1174.Value
 	//
 	//     [
 	//         {
@@ -1623,11 +1617,11 @@ func (this *Ndax) fetchTradesBody(ch chan AsyncResult[[]Trade], symbol any, opti
 		request["Count"] = limit
 	}
 
-	listEp1570 := <-this.PublicGetGetLastTrades(this.Extend(request, params))
-	if listEp1570.Err != nil {
-		panic(listEp1570.Err)
+	listEp1564 := <-this.PublicGetGetLastTrades(this.Extend(request, params))
+	if listEp1564.Err != nil {
+		panic(listEp1564.Err)
 	}
-	var response []any = listEp1570.Value
+	var response []any = listEp1564.Value
 
 	//
 	//     [
@@ -1669,11 +1663,11 @@ func (this *Ndax) fetchAccountsBody(ch chan AsyncResult[[]Account], optionalArgs
 		"UserName": this.Login,
 	}
 
-	listEp1612 := <-this.PrivateGetGetUserAccounts(this.Extend(request, params))
-	if listEp1612.Err != nil {
-		panic(listEp1612.Err)
+	listEp1606 := <-this.PrivateGetGetUserAccounts(this.Extend(request, params))
+	if listEp1606.Err != nil {
+		panic(listEp1606.Err)
 	}
-	var response []any = listEp1612.Value
+	var response []any = listEp1606.Value
 	//
 	//     [ 449 ] // comma-separated list of account ids
 	//
@@ -1755,11 +1749,11 @@ func (this *Ndax) fetchBalanceBody(ch chan AsyncResult[Balances], optionalArgs .
 		"AccountId": accountId,
 	}
 
-	listEp1688 := <-this.PrivateGetGetAccountPositions(this.Extend(request, paramsOmitted))
-	if listEp1688.Err != nil {
-		panic(listEp1688.Err)
+	listEp1682 := <-this.PrivateGetGetAccountPositions(this.Extend(request, paramsOmitted))
+	if listEp1682.Err != nil {
+		panic(listEp1682.Err)
 	}
-	var response []any = listEp1688.Value
+	var response []any = listEp1682.Value
 
 	//
 	//     [
@@ -1923,11 +1917,11 @@ func (this *Ndax) fetchLedgerBody(ch chan AsyncResult[[]LedgerEntry], optionalAr
 		request["Depth"] = limit
 	}
 
-	listEp1846 := <-this.PrivateGetGetAccountTransactions(this.Extend(request, paramsOmitted))
-	if listEp1846.Err != nil {
-		panic(listEp1846.Err)
+	listEp1840 := <-this.PrivateGetGetAccountTransactions(this.Extend(request, paramsOmitted))
+	if listEp1840.Err != nil {
+		panic(listEp1840.Err)
 	}
-	var response []any = listEp1846.Value
+	var response []any = listEp1840.Value
 	//
 	//     [
 	//         {
@@ -2332,11 +2326,11 @@ func (this *Ndax) fetchMyTradesBody(ch chan AsyncResult[[]Trade], optionalArgs .
 		request["Depth"] = limit
 	}
 
-	listEp2222 := <-this.PrivateGetGetTradesHistory(this.Extend(request, paramsOmitted))
-	if listEp2222.Err != nil {
-		panic(listEp2222.Err)
+	listEp2216 := <-this.PrivateGetGetTradesHistory(this.Extend(request, paramsOmitted))
+	if listEp2216.Err != nil {
+		panic(listEp2216.Err)
 	}
-	var response []any = listEp2222.Value
+	var response []any = listEp2216.Value
 
 	//
 	//     [
@@ -2571,11 +2565,11 @@ func (this *Ndax) fetchOpenOrdersBody(ch chan AsyncResult[[]Order], optionalArgs
 		"AccountId": accountId,
 	}
 
-	listEp2432 := <-this.PrivateGetGetOpenOrders(this.Extend(request, paramsOmitted))
-	if listEp2432.Err != nil {
-		panic(listEp2432.Err)
+	listEp2426 := <-this.PrivateGetGetOpenOrders(this.Extend(request, paramsOmitted))
+	if listEp2426.Err != nil {
+		panic(listEp2426.Err)
 	}
-	var response []any = listEp2432.Value
+	var response []any = listEp2426.Value
 
 	//
 	//     [
@@ -2690,11 +2684,11 @@ func (this *Ndax) fetchOrdersBody(ch chan AsyncResult[[]Order], optionalArgs ...
 		request["Depth"] = limit
 	}
 
-	listEp2541 := <-this.PrivateGetGetOrdersHistory(this.Extend(request, paramsOmitted))
-	if listEp2541.Err != nil {
-		panic(listEp2541.Err)
+	listEp2535 := <-this.PrivateGetGetOrdersHistory(this.Extend(request, paramsOmitted))
+	if listEp2535.Err != nil {
+		panic(listEp2535.Err)
 	}
-	var response []any = listEp2541.Value
+	var response []any = listEp2535.Value
 
 	//
 	//     [
@@ -2909,11 +2903,11 @@ func (this *Ndax) fetchOrderTradesBody(ch chan AsyncResult[[]Trade], id string, 
 		"OrderId": this.ParseToInt(id),
 	}
 
-	listEp2740 := <-this.PrivatePostGetOrderHistoryByOrderId(this.Extend(request, params))
-	if listEp2740.Err != nil {
-		panic(listEp2740.Err)
+	listEp2734 := <-this.PrivatePostGetOrderHistoryByOrderId(this.Extend(request, params))
+	if listEp2734.Err != nil {
+		panic(listEp2734.Err)
 	}
-	var response []any = listEp2740.Value
+	var response []any = listEp2734.Value
 	//
 	//     [
 	//         {
@@ -3254,11 +3248,11 @@ func (this *Ndax) fetchWithdrawalsBody(ch chan AsyncResult[[]Transaction], optio
 		"AccountId": accountId,
 	}
 
-	listEp3052 := <-this.PrivateGetGetWithdraws(this.Extend(request, paramsOmitted))
-	if listEp3052.Err != nil {
-		panic(listEp3052.Err)
+	listEp3046 := <-this.PrivateGetGetWithdraws(this.Extend(request, paramsOmitted))
+	if listEp3046.Err != nil {
+		panic(listEp3046.Err)
 	}
-	var response []any = listEp3052.Value
+	var response []any = listEp3046.Value
 
 	//
 	//     [
